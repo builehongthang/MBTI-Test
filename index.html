@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trắc Nghiệm MBTI - Thói Quen Ra Quyết Định</title>
+    <style>
+        :root { 
+            --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; 
+            --text: #1f2937; --card-bg: #ffffff;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--bg); margin: 0; padding: 20px; color: var(--text);
+            display: flex; justify-content: center;
+        }
+
+        .container { width: 100%; max-width: 800px; background: var(--card-bg); padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        
+        /* Màn hình chào */
+        #welcome-screen { text-align: center; }
+        .icon-header { font-size: 64px; margin-bottom: 20px; }
+
+        /* Tiến trình */
+        .progress-container { 
+            height: 10px; background: #e5e7eb; border-radius: 5px; 
+            margin-bottom: 20px; position: sticky; top: 10px; z-index: 100;
+        }
+        #progress-bar { height: 100%; width: 0%; background: var(--primary); border-radius: 5px; transition: 0.3s; }
+
+        /* Câu hỏi */
+        .part-header { 
+            background: #eef2ff; color: var(--primary); padding: 12px 20px; 
+            border-radius: 8px; margin: 30px 0 15px; font-weight: bold; border-left: 4px solid var(--primary);
+        }
+        .question-block { margin-bottom: 20px; padding: 15px; border: 1px solid #f3f4f6; border-radius: 10px; }
+        .question-text { font-size: 16px; font-weight: 600; margin-bottom: 12px; display: block; }
+
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .options label { 
+            padding: 12px 15px; border: 2px solid #e5e7eb; border-radius: 8px; 
+            cursor: pointer; transition: 0.2s; display: flex; align-items: center;
+        }
+        .options input { margin-right: 12px; transform: scale(1.2); }
+        .options label:hover { background: #f9fafb; border-color: var(--primary); }
+        .options label.active { background: #eef2ff; border-color: var(--primary); color: var(--primary); }
+
+        /* Nút bấm */
+        .btn { 
+            width: 100%; padding: 15px; border: none; border-radius: 8px; 
+            font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        .btn-primary { background: var(--primary); color: white; margin-top: 20px; }
+        .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+
+        /* Kết quả */
+        #result-box { display: none; text-align: center; }
+        .mbti-code { font-size: 56px; font-weight: 800; color: var(--primary); margin: 20px 0; letter-spacing: 4px; }
+        .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; text-align: left; }
+        .detail-item { background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 14px; }
+
+        @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="welcome-screen">
+        <div class="icon-header">🧠</div>
+        <h1>Khám Phá Bản Thân (MBTI)</h1>
+        <p>Chào em! Bài trắc nghiệm này có 20 tình huống giúp em tìm ra thói quen ra quyết định của chính mình.</p>
+        <button id="start-btn" class="btn btn-primary" onclick="startQuiz()" disabled>Đang tải dữ liệu...</button>
+    </div>
+
+    <div id="quiz-container" style="display:none;">
+        <div class="progress-container"><div id="progress-bar"></div></div>
+        <div id="quiz-area"></div>
+        <button class="btn btn-primary" onclick="processResult()">Xem kết quả MBTI</button>
+    </div>
+
+    <div id="result-box">
+        <div class="icon-header">✨</div>
+        <h2>Mã tính cách của bạn là:</h2>
+        <div id="mbti-result" class="mbti-code">----</div>
+        <div id="mbti-summary" class="detail-grid"></div>
+        <button class="btn" onclick="location.reload()" style="background:#6b7280; color:white;">Làm lại bài kiểm tra</button>
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwP8mDrF_IxGOmn4ZJcHB0qL8zKkGXk2SDt1clcMZe7veeclTWFj6IDocoSUiXYaPU6Vw/exec";
+    let questions = [];
+    const PARTS = [
+        "PHẦN 1: XU HƯỚNG NĂNG LƯỢNG (E/I)",
+        "PHẦN 2: CÁCH TIẾP NHẬN THÔNG TIN (S/N)",
+        "PHẦN 3: CÁCH RA QUYẾT ĐỊNH (T/F)",
+        "PHẦN 4: PHONG CÁCH SỐNG & LÀM VIỆC (J/P)"
+    ];
+
+    // Tải dữ liệu từ Google Sheet qua Apps Script
+    async function loadQuestions() {
+        try {
+            const response = await fetch(API_URL);
+            questions = await response.json();
+            if (questions.length > 0) {
+                const btn = document.getElementById('start-btn');
+                btn.disabled = false;
+                btn.innerText = "Bắt đầu ngay";
+            }
+        } catch (error) {
+            console.error("Lỗi:", error);
+            alert("Không thể kết nối dữ liệu. Hãy kiểm tra link Apps Script!");
+        }
+    }
+
+    function startQuiz() {
+        document.getElementById('welcome-screen').style.display = 'none';
+        document.getElementById('quiz-container').style.display = 'block';
+        renderQuestions();
+    }
+
+    function renderQuestions() {
+        const area = document.getElementById('quiz-area');
+        let html = "";
+        
+        for (let p = 1; p <= 4; p++) {
+            html += `<div class="part-header">${PARTS[p-1]}</div>`;
+            const partData = questions.filter(q => q.Part == p);
+            
+            partData.forEach(q => {
+                html += `
+                <div class="question-block">
+                    <span class="question-text">Câu ${q.ID}: ${q.Question}</span>
+                    <div class="options">
+                        <label id="label-${q.ID}-A">
+                            <input type="radio" name="q${q.ID}" value="A" onchange="updateUI(${q.ID}, 'A')"> <b>A.</b> ${q.OptionA}
+                        </label>
+                        <label id="label-${q.ID}-B">
+                            <input type="radio" name="q${q.ID}" value="B" onchange="updateUI(${q.ID}, 'B')"> <b>B.</b> ${q.OptionB}
+                        </label>
+                    </div>
+                </div>`;
+            });
+        }
+        area.innerHTML = html;
+    }
+
+    function updateUI(id, choice) {
+        document.getElementById(`label-${id}-A`).classList.remove('active');
+        document.getElementById(`label-${id}-B`).classList.remove('active');
+        document.getElementById(`label-${id}-${choice}`).classList.add('active');
+        
+        const answered = document.querySelectorAll('input[type="radio"]:checked').length;
+        document.getElementById('progress-bar').style.width = (answered / 20) * 100 + "%";
+    }
+
+    function processResult() {
+    const selected = document.querySelectorAll('input[type="radio"]:checked');
+    if (selected.length < 20) {
+        alert("Em hãy hoàn thành đủ 20 câu hỏi nhé!");
+        return;
+    }
+
+    let stats = [ {A:0, B:0}, {A:0, B:0}, {A:0, B:0}, {A:0, B:0} ];
+    
+    questions.forEach(q => {
+        const val = document.querySelector(`input[name="q${q.ID}"]:checked`).value;
+        stats[q.Part - 1][val]++;
+    });
+
+    // Cấu trúc ánh xạ mới khớp với yêu cầu của bạn [cite: 100, 102, 104, 106]
+    const mapping = [
+        { title: 'Xu hướng năng lượng', A: 'E (Extravert)', B: 'I (Introvert)' },
+        { title: 'Tiếp nhận thông tin', A: 'S (Sensor)', B: 'N (iNtuitive)' },
+        { title: 'Cách ra quyết định', A: 'T (Thinking)', B: 'F (Feeling)' },
+        { title: 'Phong cách sống', A: 'J (Judger)', B: 'P (Perceiver)' }
+    ];
+
+    let finalCode = "";
+    let detailHtml = "";
+
+    stats.forEach((s, i) => {
+        // Lấy chữ cái đại diện để ghép mã MBTI 
+        const charCode = s.A >= s.B ? mapping[i].A.charAt(0) : mapping[i].B.charAt(0);
+        // Lấy toàn bộ nội dung hiển thị (Ví dụ: E (Extravert)) 
+        const fullText = s.A >= s.B ? mapping[i].A : mapping[i].B;
+        
+        finalCode += charCode;
+        detailHtml += `
+            <div class="detail-item">
+                <b>${mapping[i].title}:</b> ${fullText}
+            </div>`;
+    });
+
+    document.getElementById('mbti-result').innerText = finalCode;
+    document.getElementById('mbti-summary').innerHTML = detailHtml;
+    document.getElementById('quiz-container').style.display = 'none';
+    document.getElementById('result-box').style.display = 'block';
+    window.scrollTo(0, 0);
+}
+
+    loadQuestions();
+</script>
+
+</body>
+</html>
